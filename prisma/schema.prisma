@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// ─────────────────────────────────────────────────────────────
+// Users (profile row — id matches Supabase auth.users UUID)
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id
+  name         String?
+  email        String   @unique
+  organisation String?
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projects Project[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Projects
+// ─────────────────────────────────────────────────────────────
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?  @db.Text
+  address     String?
+  postcode    String
+  lat         Float?
+  lng         Float?
+  radius      Float    @default(25.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchSessions SearchSession[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Suppliers
+// ─────────────────────────────────────────────────────────────
+
+model Supplier {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?  @db.Text
+  address         String?
+  postcode        String?
+  lat             Float?
+  lng             Float?
+  phone           String?
+  email           String?
+  website         String?
+  categories      String[] // CategoryCode enum values
+  accreditations  String[]
+  isVerified      Boolean  @default(false)
+  isManualEntry   Boolean  @default(false)
+  isNationalKnown Boolean  @default(false)
+  sourceUrl          String?
+  heritageRiskLevel  String?   // CRITICALLY_ENDANGERED | ENDANGERED | CULTURALLY_DISTINCTIVE | RESURGENT
+  heritageCraftType  String?   // e.g. "Stained glass window making"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  searchResults SearchResult[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Search Sessions & Results
+// ─────────────────────────────────────────────────────────────
+
+model SearchSession {
+  id         String   @id @default(cuid())
+  projectId  String
+  categories String[]
+  radius     Float
+  createdAt  DateTime @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  results SearchResult[]
+}
+
+model SearchResult {
+  id             String  @id @default(cuid())
+  sessionId      String
+  supplierId     String
+  distanceMiles  Float
+  isWithinRadius Boolean
+  isSaved        Boolean @default(false)
+  isDismissed    Boolean @default(false)
+  rank           Int     @default(0)
+
+  session  SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  supplier Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, supplierId])
+}

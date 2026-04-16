@@ -1,12 +1,16 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-10 (session 15 — bug track and fix)_
+_Last updated: 2026-04-16 (session 17 — deploy + search improvements)_
 
 ---
 
-## Current Status: Running locally, not yet deployed
+## Current Status: Live on Vercel
 
-TypeScript: **0 errors**. All features below are functional. Anthropic API key is valid and live searches work. Tavily API key required for web-search results; falls back to Claude knowledge-base if absent. Map uses CartoDB Positron (no API key needed).
+- **Production:** https://25-miles.vercel.app
+- **GitHub:** https://github.com/NJT2025/25-miles (push to `main` = auto-deploy)
+- **Database:** Supabase PostgreSQL, project ref `aiamulfuqekivgisdgeq`, eu-west-2
+
+TypeScript: **0 errors**. All features functional. Tavily + Anthropic keys set in Vercel env vars.
 
 **Dev server:** `node_modules/.bin/next dev` (port 3000)
 
@@ -16,9 +20,9 @@ TypeScript: **0 errors**. All features below are functional. Anthropic API key i
 
 ### Foundation
 - **Next.js 14** (App Router, TypeScript, Tailwind CSS)
-- **PostgreSQL 16** local database `25mile` — schema migrated via Prisma
+- **PostgreSQL 16** — Supabase cloud database, migrated via Prisma
 - **Prisma v7** — driver adapter pattern (`@prisma/adapter-pg`)
-- **NextAuth v5** — credentials provider, Prisma adapter, split config for Edge Runtime compatibility
+- **Supabase Auth** (`@supabase/ssr`) — email/password, domain-restricted, replaced NextAuth
 - **shadcn/ui** — button, card, input, label, select, badge, dialog, textarea, separator, toast/toaster, checkbox, tooltip
 - Earthy brand palette — background `#f7f5f0`, brand dark `#333331`, category group colours
 
@@ -28,14 +32,13 @@ TypeScript: **0 errors**. All features below are functional. Anthropic API key i
 
 | File | Purpose |
 |------|---------|
-| `lib/auth.config.ts` | Edge-compatible NextAuth config (used by middleware) |
-| `lib/auth.ts` | Full NextAuth v5 config — Credentials + Prisma adapter + bcryptjs; `ALLOWED_EMAIL_DOMAIN` enforcement |
+| `lib/supabase/server.ts` | Supabase server client (Server Components, API routes, middleware) |
+| `lib/supabase/client.ts` | Supabase browser client (Client Components) |
 | `lib/db/prisma.ts` | Prisma singleton with `PrismaPg` driver adapter |
-| `app/api/auth/[...nextauth]/route.ts` | NextAuth route handler |
-| `app/api/auth/register/route.ts` | Registration — domain-restricted, bcrypt-hashed password |
-| `middleware.ts` | Protects `/projects` and `/admin` routes |
-
-**Dev admin account:** `tonic@tonicarchitecture.co.uk` / `password123`
+| `app/(auth)/sign-in/page.tsx` | Sign-in page (Supabase Auth) |
+| `app/(auth)/register/page.tsx` | Registration — domain-restricted via `ALLOWED_EMAIL_DOMAIN` |
+| `app/api/auth/create-profile/route.ts` | Creates Prisma User row after Supabase signUp |
+| `middleware.ts` | Supabase session refresh + protects `/projects` and `/admin` routes |
 
 ---
 
@@ -64,16 +67,18 @@ TypeScript: **0 errors**. All features below are functional. Anthropic API key i
 
 **Pipeline flow:**
 1. **Session-level cache** — find a recent session (≤90 days) for this project with **exactly** the same categories (same set + same length) and **exactly** the same radius. If found and has ≥3 results: clone SearchResults and return immediately. Any change to categories or radius triggers a fresh search.
-2. Build Tavily query: `{category queries} within {radius} miles of {postcode} UK`
-3. Tavily search (up to 15 results)
-4. Claude extraction → up to 15 `ExtractedSupplier[]`; falls back to Claude knowledge-base if Tavily returns nothing
+2. Resolve postcode → place name via `getPostcodeInfo` (postcodes.io `admin_county ?? region`)
+3. **Two Tavily searches run in parallel** (deduplicated by URL before Claude sees them):
+   - General: `{category queries} {county/region} UK` (15 results, full page content)
+   - Directory: same query restricted to Yell, Checkatrade, Trustatrader, FMB, Bark etc. (10 results, full page content)
+4. Claude extraction → up to **25** `ExtractedSupplier[]` from combined pages; falls back to Claude knowledge-base if Tavily returns nothing
 5. Geocode each supplier via postcodes.io (postcode) then Mapbox (address)
 6. Calculate Haversine distance from project site
 7. Find-or-create supplier in DB (deduplicated on name + postcode)
 8. Upsert SearchResult linked to session
 9. Return sorted by distance
 
-**Result limits:** No cap on results. Tavily fetches 15, Claude generator targets 10–15, extractor up to 15.
+**Result limits:** No cap on results. Tavily: 15 general + 10 directory = up to 25 unique pages. Claude extractor cap: 25 suppliers, max_tokens: 8192.
 
 ---
 
@@ -207,8 +212,9 @@ NEXT_PUBLIC_MAPBOX_TOKEN=  # client-side map (not needed — CartoDB tiles used)
 
 ### Immediate
 - [x] **Persist dismiss** — `isDismissed Boolean @default(false)` on `SearchResult`; PATCH endpoint extended; client initialises dismissed Set from loaded results and persists on dismiss; print report filters dismissed results
-- [ ] **Accreditations filter** — filter results panel to IHBC, CITB, Guild of Master Craftsmen, etc.
-- [ ] **Deploy** — Vercel + Supabase (same pattern as BR Tracker 2); add real Tavily key
+- [x] **Accreditations filter** — implemented (session 16)
+- [x] **Search refinement** — keyword input appended to Tavily query (session 16)
+- [x] **Deploy** — live at https://25-miles.vercel.app (Vercel + Supabase)
 
 ### Phase 2
 - [ ] **Search refinement** — keyword input appended to Tavily query (e.g. "listed building", "conservation area")
@@ -280,6 +286,14 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 ### Session 14 — 2026-04-10 (persist dismiss + search route)
 36. **Persist dismiss** — added `isDismissed Boolean @default(false)` to `SearchResult` schema (migration `20260410144429_add_isdismissed`). PATCH `/api/projects/[id]/results` now accepts `{ resultId, isDismissed }` alongside `isSaved`. GET responses include `isDismissed`. Client initialises dismissed Set from loaded session results and calls PATCH fire-and-forget on dismiss; `handleSessionChange` also repopulates dismissed Set from fetched results.
 37. **Search route restored** — `app/api/projects/[id]/search/route.ts` was missing (empty directory). Recreated: auth → Zod validation → geocode project → create SearchSession → run pipeline → fetch persisted results → return `{ sessionId, projectLat, projectLng, results }` including `isDismissed`.
+
+### Session 17 — 2026-04-16 (deploy + search improvements)
+43. **Deployed to Vercel** — GitHub repo `NJT2025/25-miles`, Supabase project `aiamulfuqekivgisdgeq` (eu-west-2). Prisma migrations run via Session mode pooler (port 5432 on pooler host — direct port 5432 blocked on office network). All 8 env vars set in Vercel dashboard.
+44. **Dual Tavily searches** — pipeline now runs two searches in parallel: general query + directory-targeted query (Yell, Checkatrade, Trustatrader, FMB, Bark, etc.). Results deduplicated by URL before Claude extraction.
+45. **Full page content** — `include_raw_content: true` on both Tavily searches; Claude sees up to 3,000 chars of full page text per result (vs short snippet previously). Directory pages now expose their full listings.
+46. **Extraction cap raised** — Claude now extracts up to 25 suppliers (was 15); `max_tokens` doubled to 8,192.
+47. **Location-based query** — Tavily queries now use `adminCounty ?? region` (e.g. "London", "Gloucestershire") instead of `"within X miles of [postcode]"`. The old phrasing never matched business websites or directories; place names do.
+48. **`getPostcodeInfo`** — new function in `geocoder.ts` fetches `admin_district`, `admin_county`, `region` from postcodes.io for query building.
 
 ### Session 15 — 2026-04-10 (bug track and fix)
 38. **Print page restored** — `app/(print)/projects/[id]/print/page.tsx` was missing (layout existed, no page). Recreated with ownership check, null-coord guard, and `isDismissed: false` filter so dismissed results don't appear in print reports.

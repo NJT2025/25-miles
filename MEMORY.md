@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-16 (session 16)_
+_Last updated: 2026-04-16 (session 17)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -11,9 +11,10 @@ Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md
 Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for architecture practices to source local building materials, craftspeople, and contractors within a specified radius of a project site.
 
 - **Local:** http://localhost:3000 (run with `node_modules/.bin/next dev`)
-- **Database:** Supabase PostgreSQL (set `DATABASE_URL` pooler + `DIRECT_URL` direct in `.env.local`)
-- **Auth:** Supabase Auth (`@supabase/ssr`) — NextAuth removed
-- **Ready to deploy** to Vercel + Supabase
+- **Production:** https://25-miles.vercel.app (Vercel + Supabase)
+- **GitHub:** https://github.com/NJT2025/25-miles (push to main = auto-deploy)
+- **Database:** Supabase PostgreSQL — project ref `aiamulfuqekivgisdgeq`, eu-west-2
+- **Auth:** Supabase Auth (`@supabase/ssr`) — domain restricted to `tonicarchitecture.co.uk`
 
 ---
 
@@ -41,8 +42,8 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | File | Purpose |
 |------|---------|
 | `lib/category-definitions.ts` | 50-category taxonomy, 5 groups, colours, Tavily query fragments |
-| `lib/search/geocoder.ts` | postcodes.io + Mapbox fallback; Haversine distance (miles) |
-| `lib/search/tavily.ts` | Tavily API client (up to 15 results; returns [] gracefully if no key) |
+| `lib/search/geocoder.ts` | postcodes.io + Mapbox fallback; Haversine distance; `getPostcodeInfo` for region/county lookup |
+| `lib/search/tavily.ts` | Tavily API client — supports `includeRawContent` and `includeDomains` options |
 | `lib/search/ai-extractor.ts` | Claude API — extracts ExtractedSupplier[]; temperature: 0 |
 | `lib/search/pipeline.ts` | Session cache → Tavily → Claude → geocode → DB upsert → SearchResult |
 | `lib/supabase/server.ts` | Supabase server client (Server Components, API routes, middleware) |
@@ -125,8 +126,9 @@ const cachedSession = candidate?.categories.length === categoryCodes.length ? ca
 NEXT_PUBLIC_SUPABASE_URL="https://xxxx.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
 SUPABASE_SERVICE_ROLE_KEY="eyJ..."   # needed for domain-restricted user deletion in create-profile
-DATABASE_URL="postgresql://postgres:[pw]@aws-0-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres:[pw]@db.xxxx.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:5432/postgres"
+# Note: DIRECT_URL uses the SESSION MODE pooler (port 5432 on pooler host) — direct port 5432 is blocked on many networks
 
 ALLOWED_EMAIL_DOMAIN="tonicarchitecture.co.uk"
 TAVILY_API_KEY="..."

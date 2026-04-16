@@ -130,13 +130,11 @@ export async function runSearchPipeline({
   const queryFragments = categoryCodes.map((c) => CATEGORY_MAP[c]?.searchQuery ?? c)
   const keywordSuffix = keywords?.trim() ? ` ${keywords.trim()}` : ""
 
-  // Resolve postcode to human-readable place names for better search relevance
-  // (Tavily ranks "brick supplier London" far higher than "brick supplier within 25 miles of SW1A 1AA")
+  // Resolve postcode to a broad, human-readable location term for better search relevance
+  // Use county for rural areas (e.g. "Gloucestershire"), region for urban (e.g. "London")
+  // Avoid adminDistrict (e.g. "Westminster") — too granular for a radius search
   const postcodeInfo = await getPostcodeInfo(postcode)
-  const locationTerms = [
-    postcodeInfo?.adminDistrict,
-    postcodeInfo?.adminCounty ?? postcodeInfo?.region,
-  ].filter(Boolean).join(" ") || postcode
+  const locationTerms = postcodeInfo?.adminCounty ?? postcodeInfo?.region ?? postcode
 
   const query = `${queryFragments.join(" OR ")} ${locationTerms} UK${keywordSuffix}`
 

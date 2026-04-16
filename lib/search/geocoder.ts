@@ -67,6 +67,36 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   return { lat, lng, placeName: feature.place_name }
 }
 
+export interface PostcodeInfo {
+  adminDistrict: string | null  // e.g. "Westminster"
+  adminCounty: string | null    // e.g. "Gloucestershire"
+  region: string | null         // e.g. "London"
+}
+
+/**
+ * Fetch admin district / county / region for a UK postcode from postcodes.io.
+ * Used to build human-readable location terms for search queries.
+ */
+export async function getPostcodeInfo(postcode: string): Promise<PostcodeInfo | null> {
+  try {
+    const clean = postcode.replace(/\s+/g, "").toUpperCase()
+    const res = await fetch(`https://api.postcodes.io/postcodes/${clean}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.status === 200 && data.result) {
+        return {
+          adminDistrict: data.result.admin_district ?? null,
+          adminCounty: data.result.admin_county ?? null,
+          region: data.result.region ?? null,
+        }
+      }
+    }
+  } catch {
+    // ignore — graceful degradation to postcode
+  }
+  return null
+}
+
 /**
  * Haversine distance between two lat/lng points, in miles.
  */

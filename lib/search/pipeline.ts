@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma"
 import { tavilySearch } from "./tavily"
 import { extractSuppliers, claudeGenerateSuppliers, type ExtractedSupplier } from "./ai-extractor"
 import type { TavilyResult } from "./tavily"
-import { geocodeAddress, geocodePostcode, haversineDistanceMiles } from "./geocoder"
+import { geocodeAddress, geocodePostcode, getPostcodeInfo, haversineDistanceMiles } from "./geocoder"
 import { CATEGORY_MAP, type CategoryCode } from "@/lib/category-definitions"
 
 export interface PipelineResult {
@@ -129,7 +129,16 @@ export async function runSearchPipeline({
   // Build a combined search query for the given categories
   const queryFragments = categoryCodes.map((c) => CATEGORY_MAP[c]?.searchQuery ?? c)
   const keywordSuffix = keywords?.trim() ? ` ${keywords.trim()}` : ""
-  const query = `${queryFragments.join(" OR ")} within ${radius} miles of ${postcode} UK${keywordSuffix}`
+
+  // Resolve postcode to human-readable place names for better search relevance
+  // (Tavily ranks "brick supplier London" far higher than "brick supplier within 25 miles of SW1A 1AA")
+  const postcodeInfo = await getPostcodeInfo(postcode)
+  const locationTerms = [
+    postcodeInfo?.adminDistrict,
+    postcodeInfo?.adminCounty ?? postcodeInfo?.region,
+  ].filter(Boolean).join(" ") || postcode
+
+  const query = `${queryFragments.join(" OR ")} ${locationTerms} UK${keywordSuffix}`
 
   // UK trade directories for targeted directory search
   const UK_TRADE_DIRECTORIES = [
@@ -141,7 +150,7 @@ export async function runSearchPipeline({
   // 1. Run general search + directory-targeted search in parallel, both with full page content
   let searchResults: TavilyResult[] = []
   try {
-    const directoryQuery = `${queryFragments.join(" OR ")} ${postcode} UK${keywordSuffix}`
+    const directoryQuery = `${queryFragments.join(" OR ")} ${locationTerms} UK${keywordSuffix}`
     const [generalResults, directoryResults] = await Promise.allSettled([
       tavilySearch(query, 15, { includeRawContent: true }),
       tavilySearch(directoryQuery, 10, { includeRawContent: true, includeDomains: UK_TRADE_DIRECTORIES }),

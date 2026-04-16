@@ -217,7 +217,10 @@ NEXT_PUBLIC_MAPBOX_TOKEN=  # client-side map (not needed — CartoDB tiles used)
 - [x] **Deploy** — live at https://25-miles.vercel.app (Vercel + Supabase)
 
 ### Phase 2
-- [ ] **Search refinement** — keyword input appended to Tavily query (e.g. "listed building", "conservation area")
+- [ ] **Practice supplier database** — two-part feature:
+  - **Growing directory:** when a result is saved (`isSaved = true`), that supplier is flagged as practice-curated (new `isSaved` or `isPracticeSaved` field on `Supplier`). A practice-wide supplier list view lets the team browse and manage all suppliers saved across every project.
+  - **DB-first search:** pipeline checks the practice supplier DB before hitting Tavily/Claude. Any saved supplier whose categories match the search is included in results automatically, without a live web search. Tavily/Claude only runs for categories not covered by the DB. Over time the DB gets richer and searches get faster.
+  - **Deduplication:** suppliers matched from the DB are merged with Tavily results before geocoding/ranking, so no duplicates appear.
 - [ ] **Supplier quality signals** — badge for AI-generated vs Tavily-sourced vs manually verified results
 - [ ] **Map clustering** — group dense markers at low zoom
 - [ ] **Results pagination** — "Load more" for very large result sets

@@ -44,7 +44,7 @@ ${HERITAGE_CRAFT_LIST_FOR_PROMPT}
 
 If a supplier clearly practises one of the crafts in the HCA Heritage Crafts list above, set heritageRiskLevel to the risk level shown in brackets and heritageCraftType to the exact craft name. Only set these fields if you are confident the supplier specifically practises that heritage craft. Otherwise set both to null.
 
-Only include genuine UK-based businesses. Skip aggregator directories, news articles, and non-business entries. Return up to 15 results. Return only valid JSON, no markdown fences.`
+Only include genuine UK-based businesses. Skip news articles and non-business entries. Extract every business you can find — including those listed in directories or mentioned briefly. Return up to 25 results. Return only valid JSON, no markdown fences.`
 
 /**
  * Claude-only fallback: generate plausible UK supplier records from Claude's
@@ -109,8 +109,14 @@ export async function extractSuppliers(
 ): Promise<ExtractedSupplier[]> {
   if (searchResults.length === 0) return []
 
+  // Use raw_content (full page text) when available, truncated to 3000 chars
   const resultsText = searchResults
-    .map((r, i) => `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content}`)
+    .map((r, i) => {
+      const body = r.raw_content
+        ? r.raw_content.slice(0, 3000)
+        : r.content
+      return `[${i + 1}] ${r.title}\nURL: ${r.url}\n${body}`
+    })
     .join("\n\n---\n\n")
 
   const userPrompt = `Location context: ${locationContext}
@@ -123,7 +129,7 @@ Extract supplier records from the above. Return JSON array only.`
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: 8192,
     temperature: 0,
     messages: [{ role: "user", content: userPrompt }],
     system: SYSTEM_PROMPT,

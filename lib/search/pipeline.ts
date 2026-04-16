@@ -131,10 +131,31 @@ export async function runSearchPipeline({
   const keywordSuffix = keywords?.trim() ? ` ${keywords.trim()}` : ""
   const query = `${queryFragments.join(" OR ")} within ${radius} miles of ${postcode} UK${keywordSuffix}`
 
-  // 1. Tavily search
+  // UK trade directories for targeted directory search
+  const UK_TRADE_DIRECTORIES = [
+    "yell.com", "checkatrade.com", "trustatrader.com",
+    "fmb.org.uk", "thomsonlocal.com", "bark.com",
+    "mybuilder.com", "ratedpeople.com",
+  ]
+
+  // 1. Run general search + directory-targeted search in parallel, both with full page content
   let searchResults: TavilyResult[] = []
   try {
-    searchResults = await tavilySearch(query, 15)
+    const directoryQuery = `${queryFragments.join(" OR ")} ${postcode} UK${keywordSuffix}`
+    const [generalResults, directoryResults] = await Promise.allSettled([
+      tavilySearch(query, 15, { includeRawContent: true }),
+      tavilySearch(directoryQuery, 10, { includeRawContent: true, includeDomains: UK_TRADE_DIRECTORIES }),
+    ])
+
+    const combined = new Map<string, TavilyResult>()
+    if (generalResults.status === "fulfilled") {
+      for (const r of generalResults.value) combined.set(r.url, r)
+    }
+    if (directoryResults.status === "fulfilled") {
+      for (const r of directoryResults.value) combined.set(r.url, r)
+    }
+    searchResults = Array.from(combined.values())
+    console.log(`[pipeline] Tavily returned ${searchResults.length} unique pages`)
   } catch (err) {
     console.error("Tavily search failed:", err)
   }

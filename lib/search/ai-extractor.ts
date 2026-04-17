@@ -113,7 +113,7 @@ export async function extractSuppliers(
   const resultsText = searchResults
     .map((r, i) => {
       const body = r.raw_content
-        ? r.raw_content.slice(0, 3000)
+        ? r.raw_content.slice(0, 5000)
         : r.content
       return `[${i + 1}] ${r.title}\nURL: ${r.url}\n${body}`
     })

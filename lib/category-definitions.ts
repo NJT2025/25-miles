@@ -10,10 +10,8 @@ export type CategoryCode =
   | "MFR_SLATE"
   | "MFR_REED"
   | "MFR_NATURAL_INSULATION"
-  | "MFR_OTHER_NATURAL"
   | "MFR_RECLAMATION"
   | "MFR_NATURAL_PAINTS"
-  | "MFR_OTHER"
   // Suppliers
   | "SUP_STONE"
   | "SUP_TIMBER"
@@ -22,7 +20,6 @@ export type CategoryCode =
   | "SUP_LIME"
   | "SUP_NATURAL_INSULATION"
   | "SUP_GLAZING"
-  | "SUP_OTHER_NATURAL"
   | "SUP_RECLAMATION"
   // Craftspeople
   | "CRAFT_STONEMASON"
@@ -138,12 +135,6 @@ export const CATEGORIES: CategoryDefinition[] = [
     searchQuery: "natural insulation manufacturer sheep wool hemp flax",
   },
   {
-    code: "MFR_OTHER_NATURAL",
-    label: "Other natural materials",
-    group: "manufacturers",
-    searchQuery: "natural building materials manufacturer local",
-  },
-  {
     code: "MFR_RECLAMATION",
     label: "Reclamation yards",
     group: "manufacturers",
@@ -155,13 +146,6 @@ export const CATEGORIES: CategoryDefinition[] = [
     group: "manufacturers",
     searchQuery: "natural paints lime wash earth pigment manufacturer",
   },
-  {
-    code: "MFR_OTHER",
-    label: "Other manufacturers",
-    group: "manufacturers",
-    searchQuery: "local building material manufacturer",
-  },
-
   // ── Suppliers ──────────────────────────────────────────────
   {
     code: "SUP_STONE",
@@ -204,12 +188,6 @@ export const CATEGORIES: CategoryDefinition[] = [
     label: "Glazing",
     group: "suppliers",
     searchQuery: "heritage glazing secondary glazing traditional windows",
-  },
-  {
-    code: "SUP_OTHER_NATURAL",
-    label: "Other natural suppliers",
-    group: "suppliers",
-    searchQuery: "natural building materials supplier",
   },
   {
     code: "SUP_RECLAMATION",

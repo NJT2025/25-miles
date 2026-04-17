@@ -126,43 +126,57 @@ export async function runSearchPipeline({
     return cachedResults.sort((a, b) => a.distanceMiles - b.distanceMiles)
   }
 
-  // Build a combined search query for the given categories
-  const queryFragments = categoryCodes.map((c) => CATEGORY_MAP[c]?.searchQuery ?? c)
   const keywordSuffix = keywords?.trim() ? ` ${keywords.trim()}` : ""
 
-  // Resolve postcode to a broad, human-readable location term for better search relevance
-  // Use county for rural areas (e.g. "Gloucestershire"), region for urban (e.g. "London")
-  // Avoid adminDistrict (e.g. "Westminster") — too granular for a radius search
+  // Resolve postcode to a broad, human-readable location term for better search relevance.
+  // Include both county and region so suppliers just across a county border are captured
+  // (e.g. "Gloucestershire, South West" rather than just "Gloucestershire").
   const postcodeInfo = await getPostcodeInfo(postcode)
-  const locationTerms = postcodeInfo?.adminCounty ?? postcodeInfo?.region ?? postcode
+  const locationParts = [postcodeInfo?.adminCounty, postcodeInfo?.region]
+    .filter((v): v is string => Boolean(v))
+    .filter((v, i, arr) => arr.indexOf(v) === i) // deduplicate if county === region
+  const locationTerms = locationParts.length > 0 ? locationParts.join(", ") : postcode
 
-  const query = `${queryFragments.join(" OR ")} ${locationTerms} UK${keywordSuffix}`
-
-  // UK trade directories for targeted directory search
+  // UK trade directories for targeted directory search — general trades + heritage/conservation specialists
   const UK_TRADE_DIRECTORIES = [
     "yell.com", "checkatrade.com", "trustatrader.com",
     "fmb.org.uk", "thomsonlocal.com", "bark.com",
     "mybuilder.com", "ratedpeople.com",
+    // Heritage & conservation specialists
+    "buildingconservation.com", "spab.org.uk", "ihbc.org.uk",
+    "guildofmastercraftsmen.com",
   ]
 
-  // 1. Run general search + directory-targeted search in parallel, both with full page content
+  // 1. Group selected categories by their group type and run one Tavily search per group.
+  //    This avoids the single massive OR query diluting results across all categories.
+  //    Each group gets its own 15-result general search + 10-result directory search.
   let searchResults: TavilyResult[] = []
   try {
-    const directoryQuery = `${queryFragments.join(" OR ")} ${locationTerms} UK${keywordSuffix}`
-    const [generalResults, directoryResults] = await Promise.allSettled([
-      tavilySearch(query, 15, { includeRawContent: true }),
-      tavilySearch(directoryQuery, 10, { includeRawContent: true, includeDomains: UK_TRADE_DIRECTORIES }),
-    ])
+    const byGroup: Record<string, CategoryCode[]> = {}
+    for (const code of categoryCodes) {
+      const group = CATEGORY_MAP[code]?.group ?? "other"
+      if (!byGroup[group]) byGroup[group] = []
+      byGroup[group].push(code)
+    }
+    const groupEntries = Object.values(byGroup)
 
-    const combined = new Map<string, TavilyResult>()
-    if (generalResults.status === "fulfilled") {
-      for (const r of generalResults.value) combined.set(r.url, r)
+    const groupSearchPromises: Promise<TavilyResult[]>[] = []
+    for (const codes of groupEntries) {
+      const fragments = codes.map((c) => CATEGORY_MAP[c]?.searchQuery ?? c)
+      const groupQuery = `${fragments.join(" OR ")} ${locationTerms} UK${keywordSuffix}`
+      groupSearchPromises.push(
+        tavilySearch(groupQuery, 15, { includeRawContent: true }).catch(() => []),
+        tavilySearch(groupQuery, 10, { includeRawContent: true, includeDomains: UK_TRADE_DIRECTORIES }).catch(() => []),
+      )
     }
-    if (directoryResults.status === "fulfilled") {
-      for (const r of directoryResults.value) combined.set(r.url, r)
+
+    const allBatches = await Promise.all(groupSearchPromises)
+    const combinedMap: Record<string, TavilyResult> = {}
+    for (const batch of allBatches) {
+      for (const r of batch) combinedMap[r.url] = r
     }
-    searchResults = Array.from(combined.values())
-    console.log(`[pipeline] Tavily returned ${searchResults.length} unique pages`)
+    searchResults = Object.values(combinedMap)
+    console.log(`[pipeline] Tavily returned ${searchResults.length} unique pages across ${groupEntries.length} group(s)`)
   } catch (err) {
     console.error("Tavily search failed:", err)
   }
@@ -184,6 +198,21 @@ export async function runSearchPipeline({
     } catch (err) {
       console.error("Claude fallback failed:", err)
       return []
+    }
+  } else if (extracted.length < 5) {
+    // Tavily returned something but extraction was thin — supplement with Claude knowledge
+    console.log(`[pipeline] Only ${extracted.length} result(s) from Tavily extraction — supplementing with Claude knowledge`)
+    try {
+      const supplement = await claudeGenerateSuppliers(categoryCodes, `${postcode}, UK`, radius)
+      const existingNames = new Set(extracted.map((e) => e.name.toLowerCase()))
+      for (const s of supplement) {
+        if (!existingNames.has(s.name.toLowerCase())) {
+          extracted.push(s)
+        }
+      }
+      console.log(`[pipeline] After supplement: ${extracted.length} total results`)
+    } catch (err) {
+      console.error("Claude fallback supplement failed:", err)
     }
   }
 

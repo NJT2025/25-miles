@@ -487,7 +487,7 @@ export function ProjectSearchPage({ project, initialSession, allSessions }: Proj
           </div>
           <div className="p-4 border-t border-stone-100">
             <Button variant="ghost" size="sm" className="text-xs w-full" onClick={handleNewSearch}>
-              New search
+              Clear search
             </Button>
           </div>
         </aside>

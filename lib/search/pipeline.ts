@@ -51,7 +51,59 @@ export async function runSearchPipeline({
 }): Promise<PipelineResult[]> {
   const results: PipelineResult[] = []
 
-  // 0. Session-level cache — find a recent session (≤90 days) for this project
+  // ── STEP 1: DB-FIRST — Always inject practice-saved suppliers first ──
+  // This runs on EVERY search (cache hit or fresh) so newly-added library suppliers
+  // always appear even when the session cache would otherwise be reused.
+  const practiceHits = await prisma.supplier.findMany({
+    where: {
+      isPracticeSaved: true,
+      categories: { hasSome: categoryCodes as string[] },
+    },
+  })
+  const practiceSupplierIds = new Set<string>()
+  for (const supplier of practiceHits) {
+    const distanceMiles =
+      supplier.lat !== null && supplier.lng !== null
+        ? haversineDistanceMiles(projectLat, projectLng, supplier.lat, supplier.lng)
+        : Infinity
+    const isWithinRadius = distanceMiles <= radius
+    await prisma.searchResult.upsert({
+      where: { sessionId_supplierId: { sessionId, supplierId: supplier.id } },
+      update: { distanceMiles, isWithinRadius },
+      create: {
+        sessionId,
+        supplierId: supplier.id,
+        distanceMiles,
+        isWithinRadius,
+        rank: results.length,
+      },
+    })
+    results.push({
+      supplierId: supplier.id,
+      name: supplier.name,
+      description: supplier.description,
+      address: supplier.address,
+      lat: supplier.lat,
+      lng: supplier.lng,
+      phone: supplier.phone,
+      email: supplier.email,
+      website: supplier.website,
+      categories: supplier.categories,
+      accreditations: supplier.accreditations,
+      isVerified: supplier.isVerified,
+      distanceMiles,
+      isWithinRadius,
+      sourceUrl: supplier.sourceUrl,
+      heritageRiskLevel: supplier.heritageRiskLevel,
+      heritageCraftType: supplier.heritageCraftType,
+    })
+    practiceSupplierIds.add(supplier.id)
+  }
+  if (practiceHits.length > 0) {
+    console.log(`[pipeline] DB-first: ${practiceHits.length} practice supplier(s) injected`)
+  }
+
+  // ── STEP 2: Session-level cache — find a recent session (≤90 days) for this project ──
   //    with EXACTLY the same category set and EXACTLY the same radius.
   //    Any change in categories or radius triggers a fresh Tavily+Claude search.
   //    Keywords bypass the cache entirely — keyword searches always run fresh.
@@ -84,9 +136,10 @@ export async function runSearchPipeline({
 
   if (cachedSession && cachedSession.results.length >= 3) {
     console.log(`[pipeline] Reusing ${cachedSession.results.length} results from session ${cachedSession.id}`)
-    const cachedResults: PipelineResult[] = []
     for (const r of cachedSession.results) {
       const { supplier } = r
+      // Skip suppliers already added by the DB-first step to avoid duplicates
+      if (practiceSupplierIds.has(supplier.id)) continue
       const distanceMiles =
         supplier.lat !== null && supplier.lng !== null
           ? haversineDistanceMiles(projectLat, projectLng, supplier.lat, supplier.lng)
@@ -100,10 +153,10 @@ export async function runSearchPipeline({
           supplierId: supplier.id,
           distanceMiles,
           isWithinRadius,
-          rank: cachedResults.length,
+          rank: results.length,
         },
       })
-      cachedResults.push({
+      results.push({
         supplierId: supplier.id,
         name: supplier.name,
         description: supplier.description,
@@ -123,7 +176,7 @@ export async function runSearchPipeline({
         heritageCraftType: supplier.heritageCraftType,
       })
     }
-    return cachedResults.sort((a, b) => a.distanceMiles - b.distanceMiles)
+    return results.sort((a, b) => a.distanceMiles - b.distanceMiles)
   }
 
   const keywordSuffix = keywords?.trim() ? ` ${keywords.trim()}` : ""
@@ -147,7 +200,7 @@ export async function runSearchPipeline({
     "guildofmastercraftsmen.com",
   ]
 
-  // 1. Group selected categories by their group type and run one Tavily search per group.
+  // 3. Group selected categories by their group type and run one Tavily search per group.
   //    This avoids the single massive OR query diluting results across all categories.
   //    Each group gets its own 15-result general search + 10-result directory search.
   let searchResults: TavilyResult[] = []
@@ -181,7 +234,7 @@ export async function runSearchPipeline({
     console.error("Tavily search failed:", err)
   }
 
-  // 2. Claude extraction (or fallback if Tavily returned nothing)
+  // 4. Claude extraction (or fallback if Tavily returned nothing)
   let extracted: ExtractedSupplier[] = []
   if (searchResults.length > 0) {
     try {
@@ -197,7 +250,8 @@ export async function runSearchPipeline({
       extracted = await claudeGenerateSuppliers(categoryCodes, `${postcode}, UK`, radius)
     } catch (err) {
       console.error("Claude fallback failed:", err)
-      return []
+      // Return practice suppliers already collected rather than empty array
+      return results.sort((a, b) => a.distanceMiles - b.distanceMiles)
     }
   } else if (extracted.length < 5) {
     // Tavily returned something but extraction was thin — supplement with Claude knowledge
@@ -216,7 +270,7 @@ export async function runSearchPipeline({
     }
   }
 
-  // 3. Process each extracted supplier
+  // 5. Process each extracted supplier
   for (const item of extracted) {
     // Geocode address if we have one but no coordinates
     let lat: number | null = null
@@ -242,13 +296,16 @@ export async function runSearchPipeline({
         : Infinity
     const isWithinRadius = distanceMiles <= radius
 
-    // 4. Find or create supplier (deduplicate on name + postcode)
+    // 6. Find or create supplier (deduplicate on name + postcode)
     const existing = await prisma.supplier.findFirst({
       where: {
         name: item.name,
         ...(item.postcode ? { postcode: item.postcode } : {}),
       },
     })
+
+    // Skip suppliers already injected from the practice library
+    if (existing && practiceSupplierIds.has(existing.id)) continue
 
     let supplier
     if (existing) {
@@ -285,7 +342,7 @@ export async function runSearchPipeline({
       })
     }
 
-    // 5. Create SearchResult
+    // 7. Create SearchResult
     await prisma.searchResult.upsert({
       where: { sessionId_supplierId: { sessionId, supplierId: supplier.id } },
       update: { distanceMiles, isWithinRadius },

@@ -105,5 +105,14 @@ export async function PATCH(
     },
   })
 
+  // Auto-promote: when a result is bookmarked, add its supplier to the practice library.
+  // Un-saving does NOT remove from library — removal requires explicit action on /library.
+  if (isSaved === true) {
+    await prisma.supplier.update({
+      where: { id: result.supplierId },
+      data: { isPracticeSaved: true },
+    })
+  }
+
   return NextResponse.json(updated)
 }

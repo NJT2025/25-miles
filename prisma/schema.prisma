@@ -69,9 +69,10 @@ model Supplier {
   website         String?
   categories      String[] // CategoryCode enum values
   accreditations  String[]
-  isVerified      Boolean  @default(false)
-  isManualEntry   Boolean  @default(false)
-  isNationalKnown Boolean  @default(false)
+  isVerified       Boolean  @default(false)
+  isManualEntry    Boolean  @default(false)
+  isNationalKnown  Boolean  @default(false)
+  isPracticeSaved  Boolean  @default(false)
   sourceUrl          String?
   heritageRiskLevel  String?   // CRITICALLY_ENDANGERED | ENDANGERED | CULTURALLY_DISTINCTIVE | RESURGENT
   heritageCraftType  String?   // e.g. "Stained glass window making"

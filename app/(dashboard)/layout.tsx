@@ -35,6 +35,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/projects" className="text-sm text-stone-600 hover:text-stone-900">
             Projects
           </Link>
+          <Link href="/library" className="text-sm text-stone-600 hover:text-stone-900">
+            Library
+          </Link>
           {profile?.role === "ADMIN" && (
             <Link href="/admin" className="text-sm text-stone-600 hover:text-stone-900">
               Admin

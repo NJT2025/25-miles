@@ -158,6 +158,34 @@ export function SearchResultCard({
           )}
         </div>
 
+        {/* Quality signal badges */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {supplier.isPracticeSaved && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0"
+              style={{ color: "#7c3aed", borderColor: "#7c3aed40", backgroundColor: "#7c3aed10" }}
+            >
+              In Library
+            </Badge>
+          )}
+          {supplier.isVerified && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0"
+              style={{ color: "#15803d", borderColor: "#15803d40", backgroundColor: "#15803d10" }}
+            >
+              Verified
+            </Badge>
+          )}
+          <Badge
+            variant="secondary"
+            className="text-[10px] px-1.5 py-0 text-stone-400 border-stone-200 bg-stone-50"
+          >
+            {supplier.isManualEntry ? "Manual" : supplier.sourceUrl ? "Web" : "AI"}
+          </Badge>
+        </div>
+
         {supplier.heritageRiskLevel && (
           <div className="flex flex-wrap gap-1 mt-2">
             <Badge

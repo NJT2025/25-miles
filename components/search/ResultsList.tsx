@@ -1,8 +1,12 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Globe } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { SearchResultCard } from "./SearchResultCard"
 import type { SearchResultRow } from "@/components/project/ProjectSearchPage"
+
+const PAGE_SIZE = 20
 
 interface ResultsListProps {
   results: SearchResultRow[]
@@ -26,6 +30,15 @@ export function ResultsList({
   const within = nonNational.filter((r) => r.isWithinRadius)
   const beyond = nonNational.filter((r) => !r.isWithinRadius)
 
+  const [withinVisible, setWithinVisible] = useState(PAGE_SIZE)
+  const [beyondVisible, setBeyondVisible] = useState(PAGE_SIZE)
+
+  // Reset pagination when results change
+  useEffect(() => {
+    setWithinVisible(PAGE_SIZE)
+    setBeyondVisible(PAGE_SIZE)
+  }, [results])
+
   if (results.length === 0) {
     return (
       <p className="text-sm text-stone-400 text-center py-6">
@@ -33,6 +46,9 @@ export function ResultsList({
       </p>
     )
   }
+
+  const withinSlice = within.slice(0, withinVisible)
+  const beyondSlice = beyond.slice(0, beyondVisible)
 
   return (
     <div className="space-y-4">
@@ -42,7 +58,7 @@ export function ResultsList({
             Within radius ({within.length})
           </p>
           <div className="space-y-2">
-            {within.map((result, i) => (
+            {withinSlice.map((result, i) => (
               <SearchResultCard
                 key={result.id}
                 result={result}
@@ -54,6 +70,16 @@ export function ResultsList({
               />
             ))}
           </div>
+          {within.length > withinVisible && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2 text-xs text-stone-500"
+              onClick={() => setWithinVisible((c) => c + PAGE_SIZE)}
+            >
+              Show {Math.min(within.length - withinVisible, PAGE_SIZE)} more ({within.length - withinVisible} remaining)
+            </Button>
+          )}
         </div>
       )}
 
@@ -74,7 +100,7 @@ export function ResultsList({
             <span className="flex-1 border-t border-stone-200" />
           </p>
           <div className="space-y-2">
-            {beyond.map((result, i) => (
+            {beyondSlice.map((result, i) => (
               <SearchResultCard
                 key={result.id}
                 result={result}
@@ -86,6 +112,16 @@ export function ResultsList({
               />
             ))}
           </div>
+          {beyond.length > beyondVisible && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2 text-xs text-stone-500"
+              onClick={() => setBeyondVisible((c) => c + PAGE_SIZE)}
+            >
+              Show {Math.min(beyond.length - beyondVisible, PAGE_SIZE)} more ({beyond.length - beyondVisible} remaining)
+            </Button>
+          )}
         </div>
       )}
 

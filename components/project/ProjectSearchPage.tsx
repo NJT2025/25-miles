@@ -42,6 +42,8 @@ export interface SupplierRow {
   accreditations: string[]
   isVerified: boolean
   isNationalKnown: boolean
+  isManualEntry: boolean
+  isPracticeSaved: boolean
   sourceUrl: string | null
   heritageRiskLevel: string | null
   heritageCraftType: string | null

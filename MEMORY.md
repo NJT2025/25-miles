@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-16 (session 17)_
+_Last updated: 2026-04-17 (session 18 — Phase 2 implemented)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -62,6 +62,9 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | `components/print/PrintReportPage.tsx` | Canvas capture via onLoad, auto-print A4 layout |
 | `components/admin/AdminSupplierPanel.tsx` | Admin: manual entry, verify, delete, filter, load more |
 | `prisma/schema.prisma` | User, Project, Supplier, SearchSession, SearchResult models |
+| `app/api/library/route.ts` | GET (paginated, search) / POST (create practice supplier) |
+| `app/api/library/[id]/route.ts` | DELETE — set isPracticeSaved=false |
+| `components/library/LibraryPanel.tsx` | Practice library client UI — list, search, remove |
 | `prisma.config.ts` | Prisma v7 config — loads .env.local, sets datasource URL |
 
 ---
@@ -72,7 +75,7 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 |-------|-----------|
 | `User` | id (Supabase UUID), email, name, organisation, role (USER\|ADMIN) |
 | `Project` | id, userId, name, postcode, lat, lng, radius (default 25.0) |
-| `Supplier` | id, name, description, address, postcode, lat, lng, phone, email, website, categories String[], accreditations String[], isVerified, isManualEntry, isNationalKnown, sourceUrl, heritageRiskLevel, heritageCraftType |
+| `Supplier` | id, name, description, address, postcode, lat, lng, phone, email, website, categories String[], accreditations String[], isVerified, isManualEntry, isNationalKnown, **isPracticeSaved**, sourceUrl, heritageRiskLevel, heritageCraftType |
 | `SearchSession` | id, projectId, categories String[], radius |
 | `SearchResult` | id, sessionId, supplierId, distanceMiles, isWithinRadius, isSaved, **isDismissed**, rank |
 
@@ -117,6 +120,8 @@ const cachedSession = candidate?.categories.length === categoryCodes.length ? ca
 | `/api/projects/[id]/sessions` | GET | Session summaries list |
 | `/api/suppliers` | GET/POST | List / admin create |
 | `/api/suppliers/[id]` | PATCH/DELETE | Admin: verify or delete |
+| `/api/library` | GET/POST | Practice library — list (q, skip, take) / create with isPracticeSaved:true |
+| `/api/library/[id]` | DELETE | Remove from library (sets isPracticeSaved=false) |
 
 ---
 

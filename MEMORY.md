@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-17 (session 18 — Phase 2 implemented)_
+_Last updated: 2026-04-17 (session 18 — Phase 2)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -45,26 +45,27 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | `lib/search/geocoder.ts` | postcodes.io + Mapbox fallback; Haversine distance; `getPostcodeInfo` for region/county lookup |
 | `lib/search/tavily.ts` | Tavily API client — supports `includeRawContent` and `includeDomains` options |
 | `lib/search/ai-extractor.ts` | Claude API — extracts ExtractedSupplier[]; temperature: 0 |
-| `lib/search/pipeline.ts` | Session cache → Tavily → Claude → geocode → DB upsert → SearchResult |
+| `lib/search/pipeline.ts` | **DB-first** → session cache → Tavily → Claude → geocode → DB upsert → SearchResult |
 | `lib/supabase/server.ts` | Supabase server client (Server Components, API routes, middleware) |
 | `lib/supabase/client.ts` | Supabase browser client (Client Components) |
 | `lib/db/prisma.ts` | Prisma singleton with PrismaPg driver adapter |
 | `app/api/projects/[id]/search/route.ts` | POST — Zod validation, creates session, runs pipeline, returns results |
-| `app/api/projects/[id]/results/route.ts` | GET + PATCH (isSaved and isDismissed, ownership checked) |
+| `app/api/projects/[id]/results/route.ts` | GET + PATCH (isSaved → auto-promotes supplier to library; isDismissed) |
+| `app/api/library/route.ts` | GET (paginated + text search) / POST (create practice supplier, geocodes postcode) |
+| `app/api/library/[id]/route.ts` | DELETE — sets `isPracticeSaved=false` (soft remove from library) |
 | `components/project/ProjectSearchPage.tsx` | Main client component — all search state, map, filters, results, dismiss |
 | `components/project/DeleteProjectButton.tsx` | Inline delete confirm/cancel on project list cards |
-| `components/map/ProjectMap.tsx` | MapLibre map + Turf concentric rings (every 5mi), numbered markers |
+| `components/map/ProjectMap.tsx` | MapLibre map + Turf rings + **GeoJSON cluster layers** (click cluster = zoom in) |
 | `components/search/CategoryPanel.tsx` | Grouped checkbox filter panel |
-| `components/search/ResultsList.tsx` | Within / beyond / national sections + dismiss passthrough |
-| `components/search/SearchResultCard.tsx` | Card with save toggle + dismiss (X) button; red border + red text when outside radius |
+| `components/search/ResultsList.tsx` | Within / beyond / national sections + dismiss + **20-result pagination** |
+| `components/search/SearchResultCard.tsx` | Card with save, dismiss, heritage badges, **quality signal badges** (In Library / Verified / AI/Web/Manual) |
 | `components/search/SupplierDetailPanel.tsx` | Full supplier detail in right panel |
+| `components/library/LibraryPanel.tsx` | Practice library — search (debounced 300ms), add supplier dialog, remove, load more |
+| `app/(dashboard)/library/page.tsx` | Server page — fetches first 50 practice-saved suppliers |
 | `app/(print)/projects/[id]/print/page.tsx` | Server page — ownership check, fetches session (non-dismissed results only) |
 | `components/print/PrintReportPage.tsx` | Canvas capture via onLoad, auto-print A4 layout |
 | `components/admin/AdminSupplierPanel.tsx` | Admin: manual entry, verify, delete, filter, load more |
 | `prisma/schema.prisma` | User, Project, Supplier, SearchSession, SearchResult models |
-| `app/api/library/route.ts` | GET (paginated, search) / POST (create practice supplier) |
-| `app/api/library/[id]/route.ts` | DELETE — set isPracticeSaved=false |
-| `components/library/LibraryPanel.tsx` | Practice library client UI — list, search, remove |
 | `prisma.config.ts` | Prisma v7 config — loads .env.local, sets datasource URL |
 
 ---
@@ -77,34 +78,29 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | `Project` | id, userId, name, postcode, lat, lng, radius (default 25.0) |
 | `Supplier` | id, name, description, address, postcode, lat, lng, phone, email, website, categories String[], accreditations String[], isVerified, isManualEntry, isNationalKnown, **isPracticeSaved**, sourceUrl, heritageRiskLevel, heritageCraftType |
 | `SearchSession` | id, projectId, categories String[], radius |
-| `SearchResult` | id, sessionId, supplierId, distanceMiles, isWithinRadius, isSaved, **isDismissed**, rank |
+| `SearchResult` | id, sessionId, supplierId, distanceMiles, isWithinRadius, isSaved, isDismissed, rank |
 
-**distanceMiles note:** Infinity is stored in DB for suppliers with no geocoded location. The results API routes sanitise this to `99999` before sending JSON (JSON.stringify(Infinity) = null). All UI code checks `>= 99999` (not `=== Infinity`).
+**distanceMiles note:** Infinity is stored in DB for suppliers with no geocoded location. The results API routes sanitise this to `99999` before sending JSON. All UI code checks `>= 99999` (not `=== Infinity`).
 
-**isDismissed note:** Persisted server-side. Client initialises dismissed Set from results on load and on session switch. PATCH fires optimistically (fire-and-forget). Print report queries with `where: { isDismissed: false }`.
+**isPracticeSaved note:** Set to `true` when a user bookmarks a search result (auto-promote in PATCH handler). Suppliers with `isPracticeSaved=true` are injected at the start of every new search. Removing from /library sets it back to `false`; un-bookmarking a result does NOT remove it.
 
 ---
 
-## Search Cache Strategy
+## Search Pipeline Flow
 
-Session-level cache in pipeline.ts — **exact match only**:
-```typescript
-// 1. Query with hasEvery + exact radius
-const candidate = prisma.searchSession.findFirst({
-  where: {
-    projectId,
-    id: { not: sessionId },           // exclude current session
-    categories: { hasEvery: categoryCodes },
-    radius: { equals: radius },        // exact radius (not gte)
-    createdAt: { gte: ninetyDaysAgo },
-  }
-})
-// 2. Code-level length check for exact category match
-const cachedSession = candidate?.categories.length === categoryCodes.length ? candidate : null
-// Reuse if cachedSession.results.length >= 3
+```
+1. DB-FIRST  — inject practice-saved suppliers (hasSome category overlap) into session
+               → runs on EVERY search, including cache hits
+2. CACHE     — find session ≤90 days old, exact categories + exact radius, ≥3 results
+               → if hit: merge cached results (skip already-added practice IDs), return
+3. TAVILY    — two parallel searches per group: general + directory-targeted (deduped by URL)
+4. CLAUDE    — extract up to 25 suppliers (temperature: 0); knowledge fallback if 0 Tavily results
+5. GEOCODE   — postcodes.io → Mapbox fallback per supplier
+6. UPSERT    — find-or-create Supplier (name+postcode), skip practiceSupplierIds
+7. SORT      — return results sorted by distanceMiles
 ```
 
-**Why exact match:** The previous `hasEvery`/`gte` approach returned old broad-search results for any narrower search, making the UI appear stuck. Now any change to categories or radius triggers a fresh Tavily+Claude search.
+**Cache is exact match:** `hasEvery` (all categories present) + code-level length check (no extras) + `radius: { equals }`. Any change → fresh search. Keywords always bypass cache.
 
 ---
 
@@ -116,7 +112,7 @@ const cachedSession = candidate?.categories.length === categoryCodes.length ? ca
 | `/api/projects` | GET/POST | List / create project |
 | `/api/projects/[id]` | GET/PATCH/DELETE | Project CRUD |
 | `/api/projects/[id]/search` | POST | Run AI search pipeline (Zod validated: categories[], radius 1–200) |
-| `/api/projects/[id]/results` | GET/PATCH | Get results / toggle `isSaved` or `isDismissed` (ownership checked) |
+| `/api/projects/[id]/results` | GET/PATCH | Get results / toggle `isSaved` (auto-promotes to library) or `isDismissed` |
 | `/api/projects/[id]/sessions` | GET | Session summaries list |
 | `/api/suppliers` | GET/POST | List / admin create |
 | `/api/suppliers/[id]` | PATCH/DELETE | Admin: verify or delete |
@@ -163,11 +159,15 @@ npx prisma generate
 ## Known Gotchas
 
 - **maplibre-gl version lock:** Must stay at `^4.x`. react-map-gl@7 peer dep `<5.0.0`. Had 5.20.2 installed at one point — map rendered tiles but markers and layers silently failed.
-- **Map import:** `react-map-gl/maplibre` (not `react-map-gl`). The `maplibre` subdirectory must be present in `node_modules/react-map-gl/` — it can go missing after a partial npm install (reinstall the package to fix).
+- **Map import:** `react-map-gl/maplibre` (not `react-map-gl`). The `maplibre` subdirectory must be present in `node_modules/react-map-gl/` — it can go missing after a partial npm install.
 - **Turf import:** `import turfCircle from "@turf/circle"` (default export)
+- **Map clustering:** Uses GeoJSON `<Source cluster>` + Layer components. `onClick` handlers go on the `<Map>` component (not `<Layer>`) using `interactiveLayerIds`. `GeoJSONSource.getClusterExpansionZoom` is Promise-based in maplibre-gl 4.x.
+- **MapLibre expression types:** Complex DSL expressions (match, case, step) are typed `as any` to avoid verbose union inference errors. This is intentional.
 - **prisma migrate / generate:** requires `DATABASE_URL` in env; `prisma.config.ts` loads `.env.local` via dotenv
 - **Print report:** map canvas capture uses `onLoad` prop on `<Map>`, NOT `useEffect` (ref is null at mount)
-- **Dismiss is persisted:** `isDismissed` field on `SearchResult`. Client uses optimistic update (fire-and-forget PATCH). Dismissed items excluded from print report via server-side filter `where: { isDismissed: false }`.
-- **Claude fallback:** if Tavily returns 0 results, pipeline calls `claudeGenerateSuppliers` with knowledge-base. Both use `temperature: 0`.
+- **Dismiss is persisted:** `isDismissed` field on `SearchResult`. Client uses optimistic update (fire-and-forget PATCH). Dismissed items excluded from print report via server-side filter.
+- **isPracticeSaved auto-promote:** PATCH isSaved=true → also sets supplier.isPracticeSaved=true. Un-saving does NOT reverse this — requires explicit removal from /library.
+- **DB-first must run before cache return:** Practice suppliers are injected before the cache short-circuit so new library additions appear even on cached searches.
+- **Claude fallback:** if Tavily returns 0 results, pipeline calls `claudeGenerateSuppliers`. Both use `temperature: 0`.
 - **`npm run dev` may behave oddly** — use `node_modules/.bin/next dev` directly
 - **TypeScript check:** use `node_modules/.bin/tsc --noEmit` (not `npx tsc` — that installs a wrong package)

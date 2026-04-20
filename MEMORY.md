@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-20 (session 19)_
+_Last updated: 2026-04-20 (session 20)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -44,8 +44,9 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | `lib/category-definitions.ts` | 50-category taxonomy, 5 groups, colours, Tavily query fragments |
 | `lib/search/geocoder.ts` | postcodes.io + Mapbox fallback; Haversine distance; `getPostcodeInfo` for region/county lookup |
 | `lib/search/tavily.ts` | Tavily API client — supports `includeRawContent` and `includeDomains` options |
-| `lib/search/ai-extractor.ts` | Claude API — extracts ExtractedSupplier[]; temperature: 0 |
-| `lib/search/pipeline.ts` | **DB-first** → session cache → Tavily → Claude → geocode → DB upsert → SearchResult |
+| `lib/search/ai-extractor.ts` | Claude API — extracts ExtractedSupplier[] from Tavily pages; temperature: 0 |
+| `lib/search/url-validator.ts` | HTTP HEAD check (3s timeout) — nulls invented website URLs before DB save |
+| `lib/search/pipeline.ts` | **DB-first** → session cache → Tavily → Claude extract → URL validate → geocode → DB upsert |
 | `lib/supabase/server.ts` | Supabase server client (Server Components, API routes, middleware) |
 | `lib/supabase/client.ts` | Supabase browser client (Client Components) |
 | `lib/db/prisma.ts` | Prisma singleton with PrismaPg driver adapter |
@@ -94,10 +95,12 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 2. CACHE     — find session ≤90 days old, exact categories + exact radius, ≥3 results
                → if hit: merge cached results (skip already-added practice IDs), return
 3. TAVILY    — two parallel searches per group: general + directory-targeted (deduped by URL)
-4. CLAUDE    — extract up to 25 suppliers (temperature: 0); knowledge fallback if 0 Tavily results
-5. GEOCODE   — postcodes.io → Mapbox fallback per supplier
-6. UPSERT    — find-or-create Supplier (name+postcode), skip practiceSupplierIds
-7. SORT      — return results sorted by distanceMiles
+4. CLAUDE    — extract up to 25 suppliers from Tavily pages (temperature: 0)
+               → if 0 extracted: return practice suppliers only (no AI knowledge fallback)
+5. URL CHECK — parallel HEAD requests (3s timeout); unresolvable website URLs nulled before save
+6. GEOCODE   — postcodes.io → Mapbox fallback per supplier
+7. UPSERT    — find-or-create Supplier (name+postcode), skip practiceSupplierIds
+8. SORT      — return results sorted by distanceMiles
 ```
 
 **Cache is exact match:** `hasEvery` (all categories present) + code-level length check (no extras) + `radius: { equals }`. Any change → fresh search. Keywords always bypass cache.
@@ -168,6 +171,7 @@ npx prisma generate
 - **Dismiss is persisted:** `isDismissed` field on `SearchResult`. Client uses optimistic update (fire-and-forget PATCH). Dismissed items excluded from print report via server-side filter.
 - **isPracticeSaved auto-promote:** PATCH isSaved=true → also sets supplier.isPracticeSaved=true. Un-saving does NOT reverse this — requires explicit removal from /library.
 - **DB-first must run before cache return:** Practice suppliers are injected before the cache short-circuit so new library additions appear even on cached searches.
-- **Claude fallback:** if Tavily returns 0 results, pipeline calls `claudeGenerateSuppliers`. Both use `temperature: 0`.
+- **No Claude knowledge fallback:** `claudeGenerateSuppliers` was removed. If Tavily/extraction returns 0 results, only practice library suppliers are returned. The UI shows "No results found" with advice to broaden the search.
+- **URL validation:** `lib/search/url-validator.ts` does parallel HEAD checks (3s timeout). Domains that fail to resolve are nulled — 4xx/5xx responses are left intact (server exists).
 - **`npm run dev` may behave oddly** — use `node_modules/.bin/next dev` directly
 - **TypeScript check:** use `node_modules/.bin/tsc --noEmit` (not `npx tsc` — that installs a wrong package)

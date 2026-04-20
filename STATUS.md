@@ -1,6 +1,6 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-20 (session 19)_
+_Last updated: 2026-04-20 (session 20)_
 
 ---
 
@@ -61,8 +61,9 @@ TypeScript: **0 errors**. Build: clean. All features functional. Tavily + Anthro
 |------|---------|
 | `lib/search/geocoder.ts` | postcodes.io (free) + Mapbox Geocoding API fallback; Haversine distance in miles |
 | `lib/search/tavily.ts` | Tavily API client — returns up to 15 results per call |
-| `lib/search/ai-extractor.ts` | Claude `claude-sonnet-4-6` — extracts structured `ExtractedSupplier[]`; `temperature: 0` |
-| `lib/search/pipeline.ts` | DB-first → session cache → Tavily → Claude → geocode → DB upsert → SearchResult |
+| `lib/search/ai-extractor.ts` | Claude `claude-sonnet-4-6` — extracts structured `ExtractedSupplier[]` from Tavily pages; `temperature: 0` |
+| `lib/search/url-validator.ts` | HTTP HEAD check (3s timeout, parallel); nulls invented/dead website URLs before DB save |
+| `lib/search/pipeline.ts` | DB-first → session cache → Tavily → Claude extract → URL validate → geocode → DB upsert |
 | `app/api/projects/[id]/search/route.ts` | POST — validates body (Zod), creates SearchSession, runs pipeline, returns results + sessionId |
 
 **Pipeline flow:**
@@ -72,11 +73,12 @@ TypeScript: **0 errors**. Build: clean. All features functional. Tavily + Anthro
 4. **Two Tavily searches per group, in parallel** (deduplicated by URL):
    - General: `{category queries} {county/region} UK` (15 results, full page content)
    - Directory: same query restricted to Yell, Checkatrade, Trustatrader, FMB, Bark, IHBC, etc. (10 results)
-5. Claude extraction → up to **25** `ExtractedSupplier[]`; knowledge-base fallback if Tavily returns nothing; supplements with knowledge-base if <5 Tavily results
-6. Geocode each supplier via postcodes.io → Mapbox fallback
-7. Calculate Haversine distance from project site
-8. Find-or-create supplier in DB (deduplicated on name + postcode); skip practiceSupplierIds
-9. Upsert SearchResult; return sorted by distance
+5. Claude extraction → up to **25** `ExtractedSupplier[]` from Tavily pages. If 0 extracted: return practice suppliers only — **no AI knowledge fallback** (removed; was the primary source of hallucinated companies).
+6. **URL validation** — parallel HEAD requests (3s timeout) for all extracted website URLs. Domains that fail to resolve (ENOTFOUND, timeout, ECONNREFUSED) are nulled before saving. 4xx/5xx left intact.
+7. Geocode each supplier via postcodes.io → Mapbox fallback
+8. Calculate Haversine distance from project site
+9. Find-or-create supplier in DB (deduplicated on name + postcode); skip practiceSupplierIds
+10. Upsert SearchResult; return sorted by distance
 
 **Result limits:** No cap. Tavily: 15 general + 10 directory = up to 25 unique pages per group. Claude extractor cap: 25 suppliers, max_tokens: 8192.
 
@@ -331,6 +333,12 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 48. **Extraction cap raised** — Claude extracts up to 25 suppliers; max_tokens doubled to 8,192.
 49. **Location-based query** — Tavily queries use `adminCounty ?? region` (place names, not postcode phrases).
 50. **`getPostcodeInfo`** — new function fetching `admin_district`, `admin_county`, `region` from postcodes.io.
+
+### Session 20 — 2026-04-20 (anti-hallucination)
+66. **Removed `claudeGenerateSuppliers`** — the knowledge-base fallback was fabricating company names, addresses, phone numbers and websites with no real-world grounding. Removed from `ai-extractor.ts` entirely.
+67. **Removed zero-results and <5-results supplement** — pipeline now returns only practice library suppliers when Tavily/extraction yields nothing. No invented data is shown.
+68. **Website URL validation** — new `lib/search/url-validator.ts` performs parallel HTTP HEAD requests (3s timeout) for all extracted URLs. Domains that fail to resolve are nulled before DB save; 4xx/5xx responses are left intact.
+69. **Improved empty state** — `ResultsList` now distinguishes "never searched" from "searched but nothing found", showing a helpful message with suggestions when a search returns 0 results. `ProjectSearchPage` tracks `hasSearched` state.
 
 ### Session 19 — 2026-04-20 (search query refinement + deploy fixes)
 62. **Search query refinement** — updated Tavily `searchQuery` fragments for 12 categories: added `woodfibre` to MFR natural insulation; expanded SUP natural insulation; expanded SUP glazing with slim/vacuum double glazing terms; expanded CRAFT joiner with `joinery carpentry cabinetmaker cabinetry`; added `plastering` to lime plasterers; added `heritage` to blacksmiths; added `listed building` to 5 heritage craft queries; added `historic` to heritage woodwork.

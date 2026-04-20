@@ -1,6 +1,6 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-17 (session 18 — Phase 2 complete)_
+_Last updated: 2026-04-20 (session 19)_
 
 ---
 
@@ -331,6 +331,12 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 48. **Extraction cap raised** — Claude extracts up to 25 suppliers; max_tokens doubled to 8,192.
 49. **Location-based query** — Tavily queries use `adminCounty ?? region` (place names, not postcode phrases).
 50. **`getPostcodeInfo`** — new function fetching `admin_district`, `admin_county`, `region` from postcodes.io.
+
+### Session 19 — 2026-04-20 (search query refinement + deploy fixes)
+62. **Search query refinement** — updated Tavily `searchQuery` fragments for 12 categories: added `woodfibre` to MFR natural insulation; expanded SUP natural insulation; expanded SUP glazing with slim/vacuum double glazing terms; expanded CRAFT joiner with `joinery carpentry cabinetmaker cabinetry`; added `plastering` to lime plasterers; added `heritage` to blacksmiths; added `listed building` to 5 heritage craft queries; added `historic` to heritage woodwork.
+63. **Deploy fix** — removed orphaned NextAuth route files (`app/api/auth/[...nextauth]/route.ts`, `app/api/auth/register/route.ts`) that referenced non-existent `lib/auth.ts` and uninstalled `bcryptjs`. App uses Supabase Auth throughout — these were never needed.
+64. **API key rotation** — Anthropic API key was exposed in conversation; rotated at console.anthropic.com; updated in `.env.local` and Vercel env vars.
+65. **Tavily API key added** — `TAVILY_API_KEY` was empty; live key added to `.env.local` and Vercel env vars. Searches now use real web results rather than Claude knowledge fallback only.
 
 ### Session 18 — 2026-04-17 (Phase 2: practice library, clustering, pagination, quality badges)
 51. **Schema** — `isPracticeSaved Boolean @default(false)` added to `Supplier` (migration `20260417111922_add_ispracticesaved`).

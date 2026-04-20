@@ -21,6 +21,10 @@ export interface ExtractedSupplier {
 
 const client = new Anthropic()
 
+// ---------------------------------------------------------------------------
+// System prompt — used only for extractSuppliers (Tavily path)
+// ---------------------------------------------------------------------------
+
 const SYSTEM_PROMPT = `You are a data extraction assistant helping an architecture practice find local building material suppliers and craftspeople in the UK.
 
 Given raw web search results, extract structured information about suppliers, manufacturers, and craftspeople.
@@ -45,62 +49,6 @@ ${HERITAGE_CRAFT_LIST_FOR_PROMPT}
 If a supplier clearly practises one of the crafts in the HCA Heritage Crafts list above, set heritageRiskLevel to the risk level shown in brackets and heritageCraftType to the exact craft name. Only set these fields if you are confident the supplier specifically practises that heritage craft. Otherwise set both to null.
 
 Only include genuine UK-based businesses. Skip news articles and non-business entries. Extract every business you can find — including those listed in directories or mentioned briefly. Return up to 25 results. Return only valid JSON, no markdown fences.`
-
-/**
- * Claude-only fallback: generate plausible UK supplier records from Claude's
- * training knowledge when Tavily is not configured.
- */
-export async function claudeGenerateSuppliers(
-  categories: CategoryCode[],
-  locationContext: string,
-  radiusMiles?: number
-): Promise<ExtractedSupplier[]> {
-  const radiusContext = radiusMiles
-    ? `Search radius: ${radiusMiles} miles. Include suppliers spread across the full search area — not just those closest to the location. For a larger radius, include suppliers up to ${radiusMiles} miles away.`
-    : "Include a geographic spread — some local, some within the wider region."
-
-  const userPrompt = `You are helping an architecture practice find real UK suppliers and craftspeople.
-
-Location: ${locationContext}
-Category codes needed: ${categories.join(", ")}
-${radiusContext}
-
-Generate a list of 10–15 real or highly plausible UK businesses or sole traders that match these categories and could realistically be found within the search area. Prefer businesses that are genuinely known to exist.
-
-Return a JSON array only (no markdown). Each object must have:
-- name: string
-- description: string (2–3 sentences about what they do)
-- address: string (realistic UK address)
-- postcode: string (valid UK postcode near the location)
-- phone: string or ""
-- email: string or ""
-- website: string or ""
-- categories: string[] (subset of: ${categories.join(", ")})
-- accreditations: string[] (realistic ones such as "IHBC", "CITB", "Guild of Master Craftsmen", "Worshipful Company", or [])
-- sourceUrl: ""
-- heritageRiskLevel: string or null (CRITICALLY_ENDANGERED | ENDANGERED | CULTURALLY_DISTINCTIVE | RESURGENT | null)
-- heritageCraftType: string or null
-
-Return only valid JSON, no markdown fences.`
-
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 5000,
-    temperature: 0,
-    messages: [{ role: "user", content: userPrompt }],
-  })
-
-  const text = message.content[0].type === "text" ? message.content[0].text : ""
-  const cleaned = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim()
-
-  try {
-    const parsed = JSON.parse(cleaned)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    console.error("Failed to parse Claude-generated suppliers:", cleaned)
-    return []
-  }
-}
 
 export async function extractSuppliers(
   searchResults: TavilyResult[],

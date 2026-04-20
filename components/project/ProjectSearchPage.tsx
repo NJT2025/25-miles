@@ -124,6 +124,7 @@ export function ProjectSearchPage({ project, initialSession, allSessions }: Proj
   const [results, setResults] = useState<SearchResultRow[]>(initialSession?.results ?? [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
+  const [hasSearched, setHasSearched] = useState(!!initialSession)
   const [error, setError] = useState<string | null>(null)
   const [accreditationFilter, setAccreditationFilter] = useState<Set<string>>(new Set())
 
@@ -231,6 +232,7 @@ export function ProjectSearchPage({ project, initialSession, allSessions }: Proj
         setSessions((prev) => [newSession, ...prev])
       }
 
+      setHasSearched(true)
       toast({
         title: "Search complete",
         description: `Found ${(data.results ?? []).length} suppliers`,
@@ -252,6 +254,7 @@ export function ProjectSearchPage({ project, initialSession, allSessions }: Proj
     setDismissed(new Set())
     setKeywords("")
     setAccreditationFilter(new Set())
+    setHasSearched(false)
   }
 
   // ── Toggle save ─────────────────────────────────────────────
@@ -300,8 +303,10 @@ export function ProjectSearchPage({ project, initialSession, allSessions }: Proj
     if (!sessionId) {
       setResults([])
       setSelectedCategories(new Set())
+      setHasSearched(false)
       return
     }
+    setHasSearched(true)
 
     try {
       const res = await fetch(`/api/projects/${project.id}/results?sessionId=${sessionId}`)
@@ -638,6 +643,7 @@ export function ProjectSearchPage({ project, initialSession, allSessions }: Proj
                     onToggleSave={handleToggleSave}
                     onDismiss={handleDismiss}
                     onExpandRadius={() => setRadius((r) => Math.min(r * 2, 200))}
+                    hasSearched={hasSearched}
                   />
                 )}
               </div>

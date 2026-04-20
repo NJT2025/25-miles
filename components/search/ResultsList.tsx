@@ -15,6 +15,7 @@ interface ResultsListProps {
   onToggleSave: (resultId: string, current: boolean) => void
   onDismiss?: (resultId: string) => void
   onExpandRadius?: () => void
+  hasSearched?: boolean
 }
 
 export function ResultsList({
@@ -24,6 +25,7 @@ export function ResultsList({
   onToggleSave,
   onDismiss,
   onExpandRadius,
+  hasSearched = false,
 }: ResultsListProps) {
   const national = results.filter((r) => r.supplier.isNationalKnown)
   const nonNational = results.filter((r) => !r.supplier.isNationalKnown)
@@ -40,9 +42,19 @@ export function ResultsList({
   }, [results])
 
   if (results.length === 0) {
+    if (hasSearched) {
+      return (
+        <div className="text-center py-8 space-y-2">
+          <p className="text-sm text-stone-500 font-medium">No results found</p>
+          <p className="text-xs text-stone-400">
+            No verified suppliers were found for this area. Try a broader radius or different categories.
+          </p>
+        </div>
+      )
+    }
     return (
       <p className="text-sm text-stone-400 text-center py-6">
-        No results yet. Select categories and click Search.
+        Select categories and click Search.
       </p>
     )
   }

@@ -1,7 +1,8 @@
 // Full search pipeline: Tavily → Claude → Geocode → DB upsert → SearchResult
 import { prisma } from "@/lib/db/prisma"
 import { tavilySearch } from "./tavily"
-import { extractSuppliers, claudeGenerateSuppliers, type ExtractedSupplier } from "./ai-extractor"
+import { extractSuppliers, type ExtractedSupplier } from "./ai-extractor"
+import { validateWebsiteUrls } from "./url-validator"
 import type { TavilyResult } from "./tavily"
 import { geocodeAddress, geocodePostcode, getPostcodeInfo, haversineDistanceMiles } from "./geocoder"
 import { CATEGORY_MAP, type CategoryCode } from "@/lib/category-definitions"
@@ -234,7 +235,7 @@ export async function runSearchPipeline({
     console.error("Tavily search failed:", err)
   }
 
-  // 4. Claude extraction (or fallback if Tavily returned nothing)
+  // 4. Claude extraction from Tavily results
   let extracted: ExtractedSupplier[] = []
   if (searchResults.length > 0) {
     try {
@@ -245,32 +246,26 @@ export async function runSearchPipeline({
   }
 
   if (extracted.length === 0) {
-    console.log("[pipeline] No Tavily results — using Claude knowledge fallback")
-    try {
-      extracted = await claudeGenerateSuppliers(categoryCodes, `${postcode}, UK`, radius)
-    } catch (err) {
-      console.error("Claude fallback failed:", err)
-      // Return practice suppliers already collected rather than empty array
-      return results.sort((a, b) => a.distanceMiles - b.distanceMiles)
-    }
-  } else if (extracted.length < 5) {
-    // Tavily returned something but extraction was thin — supplement with Claude knowledge
-    console.log(`[pipeline] Only ${extracted.length} result(s) from Tavily extraction — supplementing with Claude knowledge`)
-    try {
-      const supplement = await claudeGenerateSuppliers(categoryCodes, `${postcode}, UK`, radius)
-      const existingNames = new Set(extracted.map((e) => e.name.toLowerCase()))
-      for (const s of supplement) {
-        if (!existingNames.has(s.name.toLowerCase())) {
-          extracted.push(s)
-        }
-      }
-      console.log(`[pipeline] After supplement: ${extracted.length} total results`)
-    } catch (err) {
-      console.error("Claude fallback supplement failed:", err)
-    }
+    console.log("[pipeline] No results extracted — returning practice suppliers only")
+    return results.sort((a, b) => a.distanceMiles - b.distanceMiles)
   }
 
-  // 5. Process each extracted supplier
+  // 5. Validate website URLs in parallel — null out any that don't resolve
+  const websiteUrls = extracted.map((e) => e.website ?? "").filter(Boolean)
+  const urlValidity = websiteUrls.length > 0 ? await validateWebsiteUrls(websiteUrls) : new Map<string, boolean>()
+  let nulledCount = 0
+  for (const item of extracted) {
+    if (item.website && urlValidity.get(item.website) === false) {
+      console.log(`[pipeline] Nulling unresolvable URL: ${item.website} (${item.name})`)
+      item.website = ""
+      nulledCount++
+    }
+  }
+  if (nulledCount > 0) {
+    console.log(`[pipeline] Nulled ${nulledCount} unresolvable website URL(s)`)
+  }
+
+  // 6. Process each extracted supplier
   for (const item of extracted) {
     // Geocode address if we have one but no coordinates
     let lat: number | null = null
@@ -296,7 +291,7 @@ export async function runSearchPipeline({
         : Infinity
     const isWithinRadius = distanceMiles <= radius
 
-    // 6. Find or create supplier (deduplicate on name + postcode)
+    // 7. Find or create supplier (deduplicate on name + postcode)
     const existing = await prisma.supplier.findFirst({
       where: {
         name: item.name,
@@ -342,7 +337,7 @@ export async function runSearchPipeline({
       })
     }
 
-    // 7. Create SearchResult
+    // 8. Create SearchResult
     await prisma.searchResult.upsert({
       where: { sessionId_supplierId: { sessionId, supplierId: supplier.id } },
       update: { distanceMiles, isWithinRadius },

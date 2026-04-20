@@ -132,7 +132,7 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "MFR_NATURAL_INSULATION",
     label: "Natural insulation",
     group: "manufacturers",
-    searchQuery: "natural insulation manufacturer sheep wool hemp flax",
+    searchQuery: "natural insulation manufacturer sheep wool hemp flax woodfibre",
   },
   {
     code: "MFR_RECLAMATION",
@@ -181,13 +181,13 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "SUP_NATURAL_INSULATION",
     label: "Natural insulation",
     group: "suppliers",
-    searchQuery: "sheep wool insulation natural insulation supplier",
+    searchQuery: "natural insulation supplier sheep wool hemp flax wood fibre",
   },
   {
     code: "SUP_GLAZING",
     label: "Glazing",
     group: "suppliers",
-    searchQuery: "heritage glazing secondary glazing traditional windows",
+    searchQuery: "heritage glazing secondary glazing traditional slim double glazing vacuum double glazing historic windows",
   },
   {
     code: "SUP_RECLAMATION",
@@ -207,7 +207,7 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "CRAFT_JOINER",
     label: "Joiners / carpenters",
     group: "craftspeople",
-    searchQuery: "joiner carpenter traditional woodwork craftsperson",
+    searchQuery: "joiner joinery carpenter carpentry cabinetmaker cabinetry traditional woodwork craftsperson",
   },
   {
     code: "CRAFT_TIMBER_FRAMER",
@@ -219,7 +219,7 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "CRAFT_LIME_PLASTERER",
     label: "Lime plasterers",
     group: "craftspeople",
-    searchQuery: "lime plasterer traditional plaster specialist",
+    searchQuery: "lime plasterer plastering traditional plaster specialist",
   },
   {
     code: "CRAFT_GLAZER",
@@ -237,7 +237,7 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "CRAFT_BLACKSMITH",
     label: "Blacksmiths",
     group: "craftspeople",
-    searchQuery: "blacksmith ironwork architectural metalwork",
+    searchQuery: "blacksmith ironwork heritage architectural metalwork",
   },
 
   // ── Contractors & Specialists ──────────────────────────────
@@ -277,31 +277,31 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "HERITAGE_STONEWORK",
     label: "Stonemasonry & stone carving",
     group: "heritage",
-    searchQuery: "heritage stonemason stone carver traditional masonry craftsman",
+    searchQuery: "heritage stonemason stone carver traditional masonry craftsman listed building",
   },
   {
     code: "HERITAGE_GLAZING",
     label: "Stained glass & leaded lights",
     group: "heritage",
-    searchQuery: "stained glass maker leaded lights heritage glazier traditional craft",
+    searchQuery: "stained glass maker leaded lights heritage glazier traditional craft listed building",
   },
   {
     code: "HERITAGE_TILING",
     label: "Encaustic & decorative tiling",
     group: "heritage",
-    searchQuery: "encaustic tile maker decorative heritage Victorian tile craftsman",
+    searchQuery: "encaustic tile maker decorative heritage Victorian tile craftsman listed building",
   },
   {
     code: "HERITAGE_METALWORK",
     label: "Traditional metalwork",
     group: "heritage",
-    searchQuery: "bell founder heritage metalwork traditional ironwork blacksmith craftsman",
+    searchQuery: "bell founder heritage metalwork traditional ironwork blacksmith craftsman listed building",
   },
   {
     code: "HERITAGE_PLASTERWORK",
     label: "Ornamental plasterwork",
     group: "heritage",
-    searchQuery: "ornamental plasterer fibrous plaster heritage decorative plasterwork",
+    searchQuery: "ornamental plasterer fibrous plaster heritage decorative plasterwork listed building",
   },
   {
     code: "HERITAGE_THATCH",
@@ -313,7 +313,7 @@ export const CATEGORIES: CategoryDefinition[] = [
     code: "HERITAGE_WOODWORK",
     label: "Woodcarving & traditional joinery",
     group: "heritage",
-    searchQuery: "woodcarver heritage joinery traditional woodwork craftsman green woodworking",
+    searchQuery: "woodcarver heritage historic joinery traditional woodwork craftsman green woodworking listed building",
   },
   {
     code: "HERITAGE_GILDING",

@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-21 (session 21)_
+_Last updated: 2026-04-21 (session 22)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 

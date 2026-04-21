@@ -1,6 +1,6 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-21 (session 21)_
+_Last updated: 2026-04-21 (session 22)_
 
 ---
 
@@ -333,6 +333,9 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 48. **Extraction cap raised** — Claude extracts up to 25 suppliers; max_tokens doubled to 8,192.
 49. **Location-based query** — Tavily queries use `adminCounty ?? region` (place names, not postcode phrases).
 50. **`getPostcodeInfo`** — new function fetching `admin_district`, `admin_county`, `region` from postcodes.io.
+
+### Session 22 — 2026-04-21 (default radius)
+73. **Default search radius changed to 12.5 miles** — updated in new project form state, API Zod schema default, and `prisma/schema.prisma` column default (was 25.0). Deployed.
 
 ### Session 21 — 2026-04-21 (security: key rotation)
 70. **Vercel security incident** — Vercel flagged `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, and `TAVILY_API_KEY` as "Need To Rotate".

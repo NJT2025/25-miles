@@ -10,7 +10,7 @@ const schema = z.object({
   description: z.string().optional(),
   address: z.string().optional(),
   postcode: z.string().min(1),
-  radius: z.number().positive().default(25),
+  radius: z.number().positive().default(12.5),
 })
 
 export async function POST(req: Request) {

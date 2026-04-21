@@ -15,7 +15,7 @@ export default function NewProjectPage() {
     description: "",
     address: "",
     postcode: "",
-    radius: "25",
+    radius: "12.5",
   })
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -30,7 +30,7 @@ export default function NewProjectPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        radius: parseFloat(form.radius) || 25,
+        radius: parseFloat(form.radius) || 12.5,
       }),
     })
 

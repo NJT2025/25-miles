@@ -1,6 +1,6 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-20 (session 20)_
+_Last updated: 2026-04-21 (session 21)_
 
 ---
 
@@ -224,8 +224,8 @@ Key fields:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL="https://xxxx.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
-SUPABASE_SERVICE_ROLE_KEY="eyJ..."
+NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_..."   # new Supabase key format (was eyJ...)
+SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."            # new Supabase key format (was eyJ...)
 DATABASE_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:5432/postgres"
 
@@ -333,6 +333,11 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 48. **Extraction cap raised** — Claude extracts up to 25 suppliers; max_tokens doubled to 8,192.
 49. **Location-based query** — Tavily queries use `adminCounty ?? region` (place names, not postcode phrases).
 50. **`getPostcodeInfo`** — new function fetching `admin_district`, `admin_county`, `region` from postcodes.io.
+
+### Session 21 — 2026-04-21 (security: key rotation)
+70. **Vercel security incident** — Vercel flagged `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, and `TAVILY_API_KEY` as "Need To Rotate".
+71. **Keys rotated** — All three rotated at source (Supabase dashboard + Tavily dashboard), updated in Vercel env vars and `.env.local`. Vercel redeployed.
+72. **Supabase key format migration** — Supabase has migrated from JWT (`eyJ...`) to new prefixed format: `NEXT_PUBLIC_SUPABASE_ANON_KEY` is now `sb_publishable_...`; `SUPABASE_SERVICE_ROLE_KEY` is now `sb_secret_...`. Both legacy and new formats available under "Legacy anon, service_role API keys" tab.
 
 ### Session 20 — 2026-04-20 (anti-hallucination)
 66. **Removed `claudeGenerateSuppliers`** — the knowledge-base fallback was fabricating company names, addresses, phone numbers and websites with no real-world grounding. Removed from `ai-extractor.ts` entirely.

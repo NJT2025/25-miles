@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-20 (session 20)_
+_Last updated: 2026-04-21 (session 21)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -76,7 +76,7 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | Model | Key fields |
 |-------|-----------|
 | `User` | id (Supabase UUID), email, name, organisation, role (USER\|ADMIN) |
-| `Project` | id, userId, name, postcode, lat, lng, radius (default 25.0) |
+| `Project` | id, userId, name, postcode, lat, lng, radius (default 12.5) |
 | `Supplier` | id, name, description, address, postcode, lat, lng, phone, email, website, categories String[], accreditations String[], isVerified, isManualEntry, isNationalKnown, **isPracticeSaved**, sourceUrl, heritageRiskLevel, heritageCraftType |
 | `SearchSession` | id, projectId, categories String[], radius |
 | `SearchResult` | id, sessionId, supplierId, distanceMiles, isWithinRadius, isSaved, isDismissed, rank |
@@ -128,8 +128,8 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 
 ```
 NEXT_PUBLIC_SUPABASE_URL="https://xxxx.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
-SUPABASE_SERVICE_ROLE_KEY="eyJ..."   # needed for domain-restricted user deletion in create-profile
+NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_..."   # new Supabase key format (was eyJ...)
+SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."            # new Supabase key format (was eyJ...); needed for domain-restricted user deletion in create-profile
 DATABASE_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:5432/postgres"
 # Note: DIRECT_URL uses the SESSION MODE pooler (port 5432 on pooler host) — direct port 5432 is blocked on many networks

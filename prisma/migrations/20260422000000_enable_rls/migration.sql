@@ -8,6 +8,7 @@
 -- ─────────────────────────────────────────────────────────────
 
 ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "_prisma_migrations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Project" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Supplier" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "SearchSession" ENABLE ROW LEVEL SECURITY;

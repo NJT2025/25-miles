@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-21 (session 22)_
+_Last updated: 2026-04-22 (session 23)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -131,8 +131,9 @@ NEXT_PUBLIC_SUPABASE_URL="https://xxxx.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_..."   # new Supabase key format (was eyJ...)
 SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."            # new Supabase key format (was eyJ...); needed for domain-restricted user deletion in create-profile
 DATABASE_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:5432/postgres"
-# Note: DIRECT_URL uses the SESSION MODE pooler (port 5432 on pooler host) — direct port 5432 is blocked on many networks
+DIRECT_URL="postgresql://postgres.[ref]:[pw]@db.[ref].supabase.co:5432/postgres"
+# Note: DIRECT_URL must use the DIRECT host (db.[ref].supabase.co:5432), NOT the pooler.
+# Port 5432 on the direct host may be blocked on some networks — use Supabase SQL Editor or pg npm module as fallback for migrations.
 
 ALLOWED_EMAIL_DOMAIN="tonicarchitecture.co.uk"
 TAVILY_API_KEY="..."

@@ -1,6 +1,6 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-21 (session 22)_
+_Last updated: 2026-04-22 (session 23)_
 
 ---
 
@@ -227,7 +227,7 @@ NEXT_PUBLIC_SUPABASE_URL="https://xxxx.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_..."   # new Supabase key format (was eyJ...)
 SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."            # new Supabase key format (was eyJ...)
 DATABASE_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.[ref]:[pw]@aws-1-eu-west-2.pooler.supabase.com:5432/postgres"
+DIRECT_URL="postgresql://postgres.[ref]:[pw]@db.[ref].supabase.co:5432/postgres"
 
 ALLOWED_EMAIL_DOMAIN="tonicarchitecture.co.uk"
 TAVILY_API_KEY="..."
@@ -333,6 +333,10 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 48. **Extraction cap raised** — Claude extracts up to 25 suppliers; max_tokens doubled to 8,192.
 49. **Location-based query** — Tavily queries use `adminCounty ?? region` (place names, not postcode phrases).
 50. **`getPostcodeInfo`** — new function fetching `admin_district`, `admin_county`, `region` from postcodes.io.
+
+### Session 23 — 2026-04-22 (Supabase security hardening)
+74. **RLS enabled on all tables** — Row-Level Security enabled on `User`, `Project`, `Supplier`, `SearchSession`, `SearchResult`, and `_prisma_migrations`. User-scoped policies added (auth.uid() checks). Resolves Supabase critical security alert `rls_disabled_in_public`. Prisma/server connections unaffected (postgres superuser bypasses RLS). Migration: `20260422000000_enable_rls`. Applied directly via pg client (DIRECT_URL port 5432 was blocked on local network).
+75. **DIRECT_URL corrected** — Updated `.env.local` to use `db.[ref].supabase.co:5432` (direct host) instead of the session-mode pooler.
 
 ### Session 22 — 2026-04-21 (default radius)
 73. **Default search radius changed to 12.5 miles** — updated in new project form state, API Zod schema default, and `prisma/schema.prisma` column default (was 25.0). Deployed.

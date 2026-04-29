@@ -1,6 +1,6 @@
 # 25 Miles — Developer Memory
 
-_Last updated: 2026-04-22 (session 23)_
+_Last updated: 2026-04-29 (session 25)_
 
 Quick reference for Claude Code sessions. Full feature inventory is in STATUS.md.
 
@@ -66,6 +66,10 @@ Next.js 14 / PostgreSQL / Prisma v7 / Supabase Auth / shadcn/ui platform for arc
 | `app/(print)/projects/[id]/print/page.tsx` | Server page — ownership check, fetches session (non-dismissed results only) |
 | `components/print/PrintReportPage.tsx` | Canvas capture via onLoad, auto-print A4 layout |
 | `components/admin/AdminSupplierPanel.tsx` | Admin: manual entry, verify, delete, filter, load more |
+| `app/(auth)/forgot-password/page.tsx` | Forgot password — `supabase.auth.resetPasswordForEmail` with PKCE redirectTo |
+| `app/(auth)/reset-password/page.tsx` | Reset password — `supabase.auth.updateUser`; checks active session on mount |
+| `app/auth/callback/route.ts` | PKCE code exchange; establishes session and redirects to `/reset-password` |
+| `app/api/admin/reset-link/route.ts` | Admin-only: generate recovery link via Supabase Admin `generateLink` |
 | `prisma/schema.prisma` | User, Project, Supplier, SearchSession, SearchResult models |
 | `prisma.config.ts` | Prisma v7 config — loads .env.local, sets datasource URL |
 
@@ -140,7 +144,16 @@ TAVILY_API_KEY="..."
 ANTHROPIC_API_KEY="..."
 MAPBOX_TOKEN=""              # optional
 NEXT_PUBLIC_MAPBOX_TOKEN=""  # optional
+KEEP_ALIVE_SECRET="..."      # shared between Vercel env var + GitHub Actions secret
 ```
+
+---
+
+## Supabase Keep-Alive
+
+`app/api/ping/route.ts` — GET endpoint, runs `SELECT 1` via Prisma, protected by `KEEP_ALIVE_SECRET` query param.
+`.github/workflows/keep-alive.yml` — GitHub Actions cron every 3 days (08:00 UTC), hits `/api/ping?token=...` on Vercel.
+`KEEP_ALIVE_SECRET` must be set in both Vercel env vars and as a GitHub Actions repo secret.
 
 ---
 

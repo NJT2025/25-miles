@@ -1,6 +1,6 @@
 # 25 Miles — Project Status
 
-_Last updated: 2026-04-22 (session 23)_
+_Last updated: 2026-04-29 (session 25)_
 
 ---
 
@@ -35,9 +35,13 @@ TypeScript: **0 errors**. Build: clean. All features functional. Tavily + Anthro
 | `lib/supabase/server.ts` | Supabase server client (Server Components, API routes, middleware) |
 | `lib/supabase/client.ts` | Supabase browser client (Client Components) |
 | `lib/db/prisma.ts` | Prisma singleton with `PrismaPg` driver adapter |
-| `app/(auth)/sign-in/page.tsx` | Sign-in page (Supabase Auth) |
+| `app/(auth)/sign-in/page.tsx` | Sign-in page (Supabase Auth) — includes "Forgot password?" link |
 | `app/(auth)/register/page.tsx` | Registration — domain-restricted via `ALLOWED_EMAIL_DOMAIN` |
+| `app/(auth)/forgot-password/page.tsx` | User-facing forgot password form — calls `supabase.auth.resetPasswordForEmail` |
+| `app/(auth)/reset-password/page.tsx` | Set new password form — calls `supabase.auth.updateUser`; redirects to sign-in on success |
+| `app/auth/callback/route.ts` | PKCE code exchange — exchanges Supabase recovery code for session, redirects to `/reset-password` |
 | `app/api/auth/create-profile/route.ts` | Creates Prisma User row after Supabase signUp |
+| `app/api/admin/reset-link/route.ts` | Admin-only POST — generates a recovery link via Supabase Admin API for any user email |
 | `middleware.ts` | Supabase session refresh + protects `/projects`, `/admin`, `/library` routes |
 
 ---
@@ -234,6 +238,7 @@ TAVILY_API_KEY="..."
 ANTHROPIC_API_KEY="..."
 MAPBOX_TOKEN=""              # optional — postcodes.io is primary geocoder
 NEXT_PUBLIC_MAPBOX_TOKEN=""  # optional — CartoDB tiles used for map display
+KEEP_ALIVE_SECRET="..."      # shared between Vercel env var and GitHub Actions secret (KEEP_ALIVE_SECRET)
 ```
 
 ---
@@ -255,7 +260,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=""  # optional — CartoDB tiles used for map display
 - [ ] Supplier self-registration with admin approval queue
 - [ ] Supplier profile pages (`/suppliers/[id]`)
 - [ ] Search analytics dashboard (most-searched categories, top suppliers)
-- [ ] Password reset flow
+- [x] Password reset flow (session 25)
 
 ---
 
@@ -333,6 +338,12 @@ Initial full build: foundation, auth, pipeline, UI, admin, DB schema.
 48. **Extraction cap raised** — Claude extracts up to 25 suppliers; max_tokens doubled to 8,192.
 49. **Location-based query** — Tavily queries use `adminCounty ?? region` (place names, not postcode phrases).
 50. **`getPostcodeInfo`** — new function fetching `admin_district`, `admin_county`, `region` from postcodes.io.
+
+### Session 25 — 2026-04-29 (password reset)
+77. **Password reset flow** — full user-facing forgot password + reset password pages using Supabase Auth (`resetPasswordForEmail` + `updateUser`). PKCE code exchange via `app/auth/callback/route.ts`. Admin can generate recovery links via `POST /api/admin/reset-link` (uses Supabase Admin `generateLink`). "Forgot password?" link added to sign-in page. Supabase redirect URLs allowlist updated: `https://25-miles.vercel.app/auth/callback` + `http://localhost:3000/auth/callback`.
+
+### Session 24 — 2026-04-28 (Supabase keep-alive)
+76. **Keep-alive ping** — `app/api/ping/route.ts`: GET endpoint that runs `SELECT 1` via Prisma; protected by `KEEP_ALIVE_SECRET` query param (401 if missing/wrong). `.github/workflows/keep-alive.yml`: GitHub Actions cron every 3 days at 08:00 UTC hits `/api/ping?token=...` on Vercel. Prevents Supabase free-tier auto-pause (7-day inactivity threshold). Tested — first run: Success in 13s.
 
 ### Session 23 — 2026-04-22 (Supabase security hardening)
 74. **RLS enabled on all tables** — Row-Level Security enabled on `User`, `Project`, `Supplier`, `SearchSession`, `SearchResult`, and `_prisma_migrations`. User-scoped policies added (auth.uid() checks). Resolves Supabase critical security alert `rls_disabled_in_public`. Prisma/server connections unaffected (postgres superuser bypasses RLS). Migration: `20260422000000_enable_rls`. Applied directly via pg client (DIRECT_URL port 5432 was blocked on local network).
